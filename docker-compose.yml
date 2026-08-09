@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:latest
+    image: ${POSTGRES_IMAGE:-postgres:latest}
     container_name: PostgreSQL
     restart: unless-stopped
     ports:
