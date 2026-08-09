@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:latest
+    container_name: PostgreSQL
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT_BIND:-127.0.0.1:5432:5432}"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---data-checksums}
+    command:
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-128MB}
+      - -c
+      - max_connections=${PG_MAX_CONNECTIONS:-100}
+    shm_size: ${POSTGRES_SHM_SIZE:-256mb}
+    mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
+    cpus: ${POSTGRES_CPU_LIMIT:-1.0}
+    volumes:
+      - ${POSTGRES_DATA_DIR:-./data}:/var/lib/postgresql
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  default:
+    name: ${POSTGRES_NETWORK:-postgres-net}
+    external: ${POSTGRES_NETWORK_EXTERNAL:-false}
