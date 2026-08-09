@@ -82,9 +82,9 @@ tar -czf data.tar.gz data/
 - Рекомендуемый способ восстановления из дампа:
 
 ```bash
-pg_restore -h 127.0.0.1 -p 5433 -U postgres -d <имя_базы> <файл.dump>
+pg_restore -h 127.0.0.1 -p 5434 -U postgres -d <имя_базы> <файл.dump>
 # либо для SQL-дампа:
-psql -h 127.0.0.1 -p 5433 -U postgres -d <имя_базы> < файл.sql
+psql -h 127.0.0.1 -p 5434 -U postgres -d <имя_базы> < файл.sql
 ```
 
 ## initdb (создание БД под задачу)
