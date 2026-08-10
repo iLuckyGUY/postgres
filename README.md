@@ -1,38 +1,83 @@
-# PostgreSQL — универсальный Docker-стек
+# PostgreSQL Docker Stack
 
-Самостоятельный стек PostgreSQL для развёртывания на любом сервере (Ubuntu)
-или локально (Mac). Не привязан к конкретному проекту или серверу: имена БД,
-сеть, лимиты и прочие настройки задаются переменными окружения под конкретную
-задачу.
+A universal, project-agnostic PostgreSQL stack for Docker. Deploy on any server or locally, and configure databases, network, resources and limits through environment variables — nothing is hardcoded.
 
-## Глобальное правило безопасности
+## Features
 
-- В любой документации — **только имена переменных**, никогда значения.
-- Реальные значения живут **только локально**, в отдельном env-файле, который
-  не пушится в репозиторий (запрет в `.gitignore`).
-- В стек значения попадают единственным способом — при деплое через агента Portainer.
-- Единственный env-файл в репозитории — шаблон `.env.example` с плейсхолдерами.
+- Single `docker-compose.yml` with **no secrets** — everything via environment variables
+- One DB server for **multiple projects** via a shared external network
+- Persistent data in a bind-mounted directory (easy to back up and migrate)
+- `initdb/` scripts run once on first start of an empty data directory
+- Built-in healthcheck
+- Port published on loopback only; remote access via SSH tunnel
 
-## Состав
+## Requirements
 
-| Файл/папка | Назначение |
-|---|---|
-| `docker-compose.yml` | стек, только переменные (`${VAR}`), значений нет |
-| `.env.example` | шаблон переменных с плейсхолдерами (единственный env-файл в репо) |
-| `data/` | каталог БД (bind-mount), переносится одной папкой (`tar`) |
-| `initdb/` | init-скрипты под задачу, выполняются только на пустой PGDATA |
+- Docker Engine 20+ with Compose v2
+- Optional: Portainer for GitOps deployment
 
-## Сеть: один сервер БД для любых проектов
+## Quick start
 
-Парадигма: сервер БД живёт на **стабильной инфраструктурной сети**, а
-**проекты подключаются к нему из своих compose-файлов** — добавляют эту сеть
-к сервисам, которым нужна БД.
+```bash
+cp .env.example .env   # fill in values
+docker compose --env-file .env up -d
+```
 
-Стек БД **не перечисляет проекты**: их список заранее неизвестен, и новый
-проект не должен требовать редеплоя сервера БД. Направление только одно —
-проект идёт к сети БД, а не наоборот.
+Without an env file the compose file is self-sufficient: it creates the `postgres-net` network and `./data` directory.
 
-Сеть сервера БД задаётся переменными:
+## Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `POSTGRES_USER` | `postgres` | Superuser name |
+| `POSTGRES_PASSWORD` | — | Superuser password; applied only on empty PGDATA |
+| `POSTGRES_DB` | `postgres` | Default database created on empty PGDATA |
+| `POSTGRES_IMAGE` | `postgres:latest` | Image tag (keep on the cluster major) |
+| `POSTGRES_NETWORK` | `postgres-net` | Network name for the DB server |
+| `POSTGRES_NETWORK_EXTERNAL` | `false` | Use an existing external network |
+| `POSTGRES_PORT_BIND` | `127.0.0.1:5432:5432` | Host→container port mapping (loopback only) |
+| `POSTGRES_DATA_DIR` | `./data` | Data directory (use an absolute path in Portainer) |
+| `POSTGRES_MEM_LIMIT` | `512m` | Container memory limit |
+| `POSTGRES_CPU_LIMIT` | `1.0` | Container CPU limit |
+| `POSTGRES_SHM_SIZE` | `256mb` | `/dev/shm` size |
+| `PG_SHARED_BUFFERS` | `128MB` | `shared_buffers` |
+| `PG_MAX_CONNECTIONS` | `100` | `max_connections` |
+| `POSTGRES_INITDB_ARGS` | `--data-checksums` | `initdb` arguments (empty PGDATA only) |
+
+> `POSTGRES_PASSWORD` and `POSTGRES_INITDB_ARGS` take effect **only on an empty
+> data directory** (first start). On an existing cluster the values are ignored.
+
+## Deployment
+
+### Portainer (GitOps)
+
+1. Stacks → Add stack.
+2. Repository → this repo, compose file `docker-compose.yml`.
+3. Fill the environment variables from your local env file.
+4. Use an **absolute** `POSTGRES_DATA_DIR` path for the bind mount.
+5. Deploy.
+
+### Docker CLI
+
+```bash
+docker compose --env-file myenv.env up -d
+docker compose --env-file myenv.env down
+```
+
+## Security
+
+- No secrets are stored in the repository. Values live in a **local** env file (excluded by `.gitignore`) and are provided at deploy time.
+- The only committed env file is `.env.example` with placeholders.
+- The published port is bound to `127.0.0.1`; for remote access use an SSH tunnel:
+
+```bash
+ssh -L 5434:127.0.0.1:5434 user@host
+psql -h 127.0.0.1 -p 5434 -U postgres
+```
+
+## Networking: one DB server for many projects
+
+The DB server lives on a stable infrastructure network, and projects join it from their own compose files. The DB stack does not list projects — a new project must not require redeploying the DB server.
 
 ```yaml
 networks:
@@ -41,97 +86,53 @@ networks:
     external: ${POSTGRES_NETWORK_EXTERNAL:-false}
 ```
 
-### Как проект подключается
-
-Проект добавляет сеть БД к своим сервисам (пример):
+Project side — add the DB network to the services that need it:
 
 ```yaml
 networks:
-  my-net:                       # своя сеть проекта (как обычно)
-    external: true
-    name: my-net
-  db-net:                       # сеть сервера БД
+  db-net:
     external: true
     name: db-net
 
 services:
   my-service:
-    networks: [my-net, db-net]   # ← добавить сеть БД
+    networks: [my-net, db-net]
 ```
 
-После этого сервис обращается к БД по имени `PostgreSQL` (container_name) —
-оно разрешается внутри сети БД. Docker позволяет контейнеру быть сразу в
-нескольких сетях.
+Services reach the database by `PostgreSQL` (container_name) inside that network.
 
-## Развёртывание
+## Data directory
 
-### Через Portainer (основной способ)
-
-1. Portainer → стеки → создать стек.
-2. Вставить содержимое `docker-compose.yml`.
-3. В переменных окружения стека заполнить значения из локального env-файла
-   (на файловой системе сервера остаются только имена переменных).
-4. Для bind-mount использовать **абсолютный** путь данных
-   (`POSTGRES_DATA_DIR`) — относительные пути у Portainer не работают.
-5. Deploy. Значения `POSTGRES_PASSWORD` применяются только на **пустой** PGDATA.
-
-### Локально (Mac)
-
-```bash
-docker compose --env-file myenv.env up -d
-docker compose --env-file myenv.env down
-```
-
-Без env-файла compose самодостаточен: создаёт сеть `postgres-net` и `./data`.
-
-## Подключение (безопасно, без открытых портов)
-
-Внешний порт опубликован только на `127.0.0.1`. Для удалённого доступа (pgAdmin
-или psql с локального компа) — SSH-туннель до хоста сервера. Стандартный
-хост-порт `5432` может быть занят другим стеком на сервере, поэтому для
-отдельного PostgreSQL принята конвенция `5434`:
-
-```bash
-ssh -L 5434:127.0.0.1:5434 <пользователь>@<хост-сервера>
-psql -h 127.0.0.1 -p 5434 -U postgres
-```
-
-Соответственно в `POSTGRES_PORT_BIND` задаётся `127.0.0.1:5434:5432`.
-
-pgAdmin: New Server → SSH Tunnel (хосты/ключ SSH) → Connection `127.0.0.1:5434`.
-
-## Данные: перенос одной папкой
-
-Каталог `data/` содержит все базы. Чтобы переехать на другой сервер:
+`POSTGRES_DATA_DIR` (default `./data`) holds all databases. To migrate to another server:
 
 ```bash
 docker compose --env-file myenv.env down
 tar -czf data.tar.gz data/
-# развернуть на другом хосте в тот же относительный путь (или задать POSTGRES_DATA_DIR)
 ```
 
-На пустой PGDATA данные не создаются — для нового инстанса положите init-скрипты
-в `initdb/` (см. ниже).
+On the target server: extract to the same path (or set `POSTGRES_DATA_DIR`), `chown -R 999:999 <dir>`, and use an image whose major is `>=` the cluster major (from `PG_VERSION`). An existing cluster is **not** reinitialized on start.
 
-## Бэкапы
-
-- Рекомендуется cron с ежедневным `pg_dump` в каталог бэкапов.
-- Рекомендуемый способ восстановления из дампа:
+## Backup & restore
 
 ```bash
-pg_restore -h 127.0.0.1 -p 5434 -U postgres -d <имя_базы> <файл.dump>
-# либо для SQL-дампа:
-psql -h 127.0.0.1 -p 5434 -U postgres -d <имя_базы> < файл.sql
+# backup one database (custom format, with compression)
+pg_dump -Fc -U postgres -d mydb -f mydb.dump
+
+# restore
+pg_restore -U postgres -d mydb mydb.dump
+
+# plain SQL dump / restore
+pg_dump -U postgres -d mydb > mydb.sql
+psql -U postgres -d mydb < mydb.sql
 ```
 
-## initdb (создание БД под задачу)
+See the official documentation: [PostgreSQL Backup and Restore](https://www.postgresql.org/docs/current/backup-dump.html), [pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html), [pg_restore](https://www.postgresql.org/docs/current/app-pgrestore.html).
 
-Папка `initdb/` монтируется в `/docker-entrypoint-initdb.d`. Скрипты `*.sql`/`*.sh`
-выполняются один раз при первом старте **пустой** PGDATA, в порядке имён.
-Для нового инстанса положите туда, например:
+## initdb
+
+Place `*.sql` / `*.sh` files into `initdb/` — they run once, in name order, on the first start of an **empty** data directory.
 
 ```sql
--- 01-create-dbs.sql
 CREATE DATABASE first_db;
 CREATE DATABASE second_db;
 ```
