@@ -43,6 +43,7 @@ Without an env file the compose file is self-sufficient: it creates the `postgre
 | `PG_SHARED_BUFFERS` | `128MB` | `shared_buffers` |
 | `PG_MAX_CONNECTIONS` | `100` | `max_connections` |
 | `POSTGRES_INITDB_ARGS` | `--data-checksums` | `initdb` arguments (empty PGDATA only) |
+| `INITDB_DATABASES` | — | Space-separated DB names created on empty PGDATA by `initdb/10-create-databases.sh` |
 
 > `POSTGRES_PASSWORD` and `POSTGRES_INITDB_ARGS` take effect **only on an empty
 > data directory** (first start). On an existing cluster the values are ignored.
@@ -51,11 +52,15 @@ Without an env file the compose file is self-sufficient: it creates the `postgre
 
 ### Portainer (GitOps)
 
-1. Stacks → Add stack.
+1. Stacks → Add stack (older Portainer).
 2. Repository → this repo, compose file `docker-compose.yml`.
 3. Fill the environment variables from your local env file.
 4. Use an **absolute** `POSTGRES_DATA_DIR` path for the bind mount.
 5. Deploy.
+
+In newer Portainer the GitOps binding is split: add this repo (and compose
+`docker-compose.yml`) under **Sources**, then create the deployment under
+**Workflows** — the environment fields stay the same as above.
 
 ### Docker CLI
 
@@ -136,3 +141,7 @@ Place `*.sql` / `*.sh` files into `initdb/` — they run once, in name order, on
 CREATE DATABASE first_db;
 CREATE DATABASE second_db;
 ```
+
+To create databases from a list without hardcoding names in the repo, set the
+`INITDB_DATABASES` variable (space-separated names in your env file). The bundled
+`initdb/10-create-databases.sh` then creates the missing ones on first start.
