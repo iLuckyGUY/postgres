@@ -1,5 +1,6 @@
 services:
   postgres:
+    container_name: PostgreSQL
     image: ${POSTGRES_IMAGE:-postgres:19.0-trixie}
     restart: unless-stopped
     stop_grace_period: 60s
