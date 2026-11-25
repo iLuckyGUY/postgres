@@ -3,6 +3,9 @@ services:
     image: ${POSTGRES_IMAGE:-postgres:19.0-trixie}
     restart: unless-stopped
     stop_grace_period: 60s
+    mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
+    cpus: ${POSTGRES_CPU_LIMIT:-1.0}
+    shm_size: ${POSTGRES_SHM_SIZE:-256mb}
     security_opt:
       - no-new-privileges:true
     environment:
