@@ -1,56 +1,33 @@
 services:
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:19.0-trixie}
-    container_name: PostgreSQL
     restart: unless-stopped
     stop_grace_period: 60s
     security_opt:
       - no-new-privileges:true
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    ports:
-      - "${POSTGRES_PORT_BIND:-127.0.0.1:5432:5432}"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
-      POSTGRES_PASSWORD_FILE: ${POSTGRES_PASSWORD_FILE:-}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Portainer}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
-      POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---data-checksums}
-      INITDB_DATABASES: ${INITDB_DATABASES:-}
-    command:
-      - -c
-      - shared_buffers=${PG_SHARED_BUFFERS:-128MB}
-      - -c
-      - max_connections=${PG_MAX_CONNECTIONS:-100}
-    shm_size: ${POSTGRES_SHM_SIZE:-256mb}
-    mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
-    cpus: ${POSTGRES_CPU_LIMIT:-1.0}
+    ports:
+      - "127.0.0.1:${PGBIND_PORT:-5434}:5432"
     volumes:
-      - type: bind
-        source: ${POSTGRES_DATA_DIR:-./data}
-        target: /var/lib/postgresql
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ${POSTGRES_INITDB_DIR:-./initdb}
-        target: /docker-entrypoint-initdb.d
-        read_only: true
-        bind:
-          create_host_path: false
+      # ИСКЛЮЧЕНИЕ: точка монтирования задана официальным образом PostgreSQL 19.
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 30s
+    logging:
+      driver: local
+
+volumes:
+  postgres_data:
 
 networks:
   default:
     name: ${POSTGRES_NETWORK:-postgres-net}
     external: ${POSTGRES_NETWORK_EXTERNAL:-false}
-
-  # See README.md for the shared network settings in application stacks.
