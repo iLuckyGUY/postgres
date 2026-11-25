@@ -4,14 +4,15 @@
 # never touched. Keep this script generic — database names come from env, never
 # hardcode them here.
 set -euo pipefail
+set -f
 
 [ -z "${INITDB_DATABASES:-}" ] && exit 0
 
 for db in ${INITDB_DATABASES}; do
-  if ! psql -U "${POSTGRES_USER:-postgres}" -Atqc "SELECT 1 FROM pg_database WHERE datname='${db}'" | grep -q 1; then
-    echo "[initdb] creating database ${db}"
-    createdb -U "${POSTGRES_USER:-postgres}" "${db}"
-  else
-    echo "[initdb] database ${db} already exists"
-  fi
+  psql --no-psqlrc --set=ON_ERROR_STOP=1 \
+    --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --set=db="$db" <<'SQL'
+SELECT format('CREATE DATABASE %I', :'db')
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'db')
+\gexec
+SQL
 done
