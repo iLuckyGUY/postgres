@@ -6,17 +6,14 @@
 
 1. Выберите нужное окружение Docker в Portainer. Откройте **Stacks → Add stack → Git Repository**.
 2. Выберите этот репозиторий, ветку `refs/heads/main` и путь `docker-compose.yml`. Для обновлений по вашему решению оставьте **GitOps updates** выключенным.
-3. В **Environment variables** задайте нужные параметры из [.env.example](.env.example) и выберите способ передачи пароля из раздела ниже. Можно загрузить приватный env-файл через **Load variables from .env file**. Ограничьте права локального файла до `0600` и храните его вне Git.
+3. В **Environment variables** загрузите приватный `postgres.env` через **Load variables from .env file**. Список переменных есть в [.env.example](.env.example). `POSTGRES_PASSWORD` обязателен. Ограничьте права локального файла до `0600` и храните его вне Git.
 4. Нажмите **Deploy the stack**. Дождитесь статуса `healthy` и проверьте подключение клиента.
 
 [Документация Portainer](https://docs.portainer.io/user/docker/stacks/add)
 
 ## Пароль
 
-- **Переменная окружения.** Задайте непустой `POSTGRES_PASSWORD` при первом запуске. Значение доступно через конфигурацию контейнера администраторам Docker.
-- **Файл секрета.** Разместите непустой файл пароля вне репозитория на Docker-хосте, ограничьте права до `0600` и обеспечьте чтение для запускающегося контейнера. Добавьте `compose.password-file.yml` в **Additional paths**, задайте буквальный абсолютный путь в `POSTGRES_PASSWORD_SOURCE` и очистите `POSTGRES_PASSWORD` в Portainer. Для Compose CLI добавьте `-f docker-compose.yml -f compose.password-file.yml`. Compose монтирует файл только для чтения. [Секреты Docker Compose](https://docs.docker.com/compose/how-tos/use-secrets/)
-
-На пустом томе официальный образ отклоняет запуск без пароля. `POSTGRES_USER`, `POSTGRES_PASSWORD` и `POSTGRES_DB` задают начальные параметры кластера. Для смены пароля действующей роли используйте `\password` в `psql` и обновите настройки клиентов.
+Значение `POSTGRES_PASSWORD` доступно администраторам Docker через конфигурацию контейнера. `POSTGRES_USER`, `POSTGRES_PASSWORD` и `POSTGRES_DB` задают начальные параметры кластера на пустом томе. Для смены пароля действующей роли используйте `\password` в `psql` и обновите настройки клиентов.
 
 ## Подключение
 
