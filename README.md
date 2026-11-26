@@ -23,4 +23,4 @@
 
 ## Том и повторное развёртывание
 
-Compose создаёт том `<имя-стека>_postgres_data`. При обновлении используйте тот же стек на том же Docker-хосте, чтобы сохранить привязку к тому. На другом хосте Compose создаст новый том. Имя контейнера `PostgreSQL` должно быть свободно при первом развёртывании. Проверить конфигурацию локально можно командой `docker compose --env-file postgres.env config --quiet`. [Тома Docker](https://docs.docker.com/engine/storage/volumes/)
+Compose использует том `postgres_data` на Docker-хосте и создаёт его при первом развёртывании. Имя тома фиксировано, поэтому используйте этот стек для одного экземпляра PostgreSQL на хосте. Имя контейнера `PostgreSQL` должно быть свободно при первом развёртывании. Проверить конфигурацию локально можно командой `docker compose --env-file postgres.env config --quiet`. [Тома Docker](https://docs.docker.com/engine/storage/volumes/)
